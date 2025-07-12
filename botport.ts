@@ -291,6 +291,7 @@ interface PendingRequest {
     resolve: (value: ClientResponse) => void;
     reject: (reason?: any) => void;
     onUpdate?: (update: ClientResponse) => void;
+    timeoutId: NodeJS.Timeout;
 }
 
 /**
@@ -326,37 +327,44 @@ export class BotAPIClient {
     private handleReply(message: Message) {
         if (message.author.id !== this.targetBotId || !message.reference?.messageId) return;
 
+        // Use the original request message ID for the lookup
         const pending = this.pendingRequests.get(message.reference.messageId);
         if (!pending) return;
 
         const content = message.content;
         const firstSpaceIndex = content.indexOf(' ');
-        if (firstSpaceIndex === -1) return; // Ignore malformed
+        if (firstSpaceIndex === -1) return;
 
         const statusStr = content.substring(0, firstSpaceIndex);
         const bodyStr = content.substring(firstSpaceIndex + 1);
         const status = parseInt(statusStr, 10);
-        if (isNaN(status)) return; // Ignore malformed
+        if (isNaN(status)) return;
 
         try {
             const body = JSON.parse(bodyStr);
             const response: ClientResponse = { status, body };
 
-            // If it's an informational status (1xx), trigger onUpdate and keep waiting.
             if (status >= 100 && status < 200) {
+                // It's an update. The "keep-alive" signal.
+                // Clear the timeout! The request will now wait indefinitely for a final response.
+                clearTimeout(pending.timeoutId);
                 pending.onUpdate?.(response);
-            }
-            // Otherwise, it's a final response. Resolve the promise and clean up.
-            else {
+            } else {
+                // It's a final response.
+                // We still clear the timeout just in case, then resolve.
+                clearTimeout(pending.timeoutId);
                 pending.resolve(response);
                 this.pendingRequests.delete(message.reference.messageId);
             }
         } catch (error) {
-            // If JSON parsing fails on a final message, reject.
-            pending.reject(new Error("Malformed response: Invalid JSON body."));
-            this.pendingRequests.delete(message.reference.messageId);
+            if (status >= 200) {
+                clearTimeout(pending.timeoutId);
+                pending.reject(new Error("Malformed response: Invalid JSON body."));
+                this.pendingRequests.delete(message.reference.messageId);
+            }
         }
     }
+
 
     private async makeRequest(method: HttpMethod, route: string, options: ClientRequestOptions = {}): Promise<ClientResponse> {
         const { body, onUpdate, timeout = this.defaultTimeout } = options;
@@ -369,21 +377,21 @@ export class BotAPIClient {
         const requestMessage = await this.transport.send(requestString);
 
         return new Promise((resolve, reject) => {
+            // Create the timeout timer
             const timeoutId = setTimeout(() => {
                 this.pendingRequests.delete(requestMessage.id);
-                reject(new Error(`Request timed out after ${timeout}ms`));
+                reject(new Error(`Request timed out after ${timeout}ms waiting for an initial response.`));
             }, timeout);
 
             this.pendingRequests.set(requestMessage.id, {
                 resolve: (response) => {
-                    clearTimeout(timeoutId);
                     resolve(response);
                 },
                 reject: (reason) => {
-                    clearTimeout(timeoutId);
                     reject(reason);
                 },
                 onUpdate,
+                timeoutId,
             });
         });
     }
