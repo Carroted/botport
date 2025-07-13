@@ -33,7 +33,12 @@ This is such a cool docs. Unlimited length since it sends as a file.
 
 const server = new BotAPIServer(client, {
     docs,
-    shortDescription: 'This is my bot where stuff happens'
+    shortDescription: 'This is my bot where stuff happens',
+
+    // You can also specify a `privateKey` here!
+    // `botport.ts` includes a `generateKeys` function that returns a public and private key.
+    // For E2EE, put the private key in a file also included in your `.gitignore`, and read it from that
+    // E2EE is optional in botport though
 });
 
 // Listen to GET requests of `/balance/<user id>`
