@@ -12,8 +12,15 @@ Bot API client/server library for Discord bots communicating using text channels
   - To simply get a list of bots without that info:
     - `botport.ts` exports a `find` function
       - The protocol supports find by allowing a user or bot to send `botport:find` and wait for 🙋 reacts
-- Optional E2EE, with replay attack protection
+- Optional E2EE, with replay attack protection against different user sending someone else's encrypted request
+  - If client sends a request with old public key, server will tell the client it failed to decrypt and tell it the new public key
+    - Client then retries request automatically with that key instead
 - Built-in documentation system for routes and servers
+
+## Bot Permissions Needed
+- Send Messages
+- Add Reactions
+- Create Public Threads
 
 ## Installation
 
