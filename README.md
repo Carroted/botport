@@ -92,9 +92,12 @@ server.get('/balance/:userId', (req, res) => {
 
 ### Encryption Setup
 Clients don't need to do anything (except probably set `forceSecure` to `true`), but servers just need to:
-1. Run `const { generateKeys } = require('./src/botport.ts'); fs.writeFileSync('privatekey.txt', generateKeys().privateKey);` in a repl (like `bun repl`)
-2. Add `privatekey.txt` to your `.gitignore`
-3. Add this to your `new BotAPIServer` options:
+1. Run the following in a repl (like `bun repl`):
+   ```ts
+   const { generateKeys } = require('./src/botport.ts'); fs.writeFileSync('privatekey.txt', generateKeys().privateKey);
+   ```
+3. Add `privatekey.txt` to your `.gitignore`
+4. Add this to your `new BotAPIServer` options:
    ```ts
        privateKey: fs.readFileSync('privatekey.txt', 'utf-8'),
    ```
